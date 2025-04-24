@@ -84,8 +84,20 @@ generate_tree() {
 generate_file_content() {
   local file_pattern_args=() dir_exclude_args=() file_exclude_args=()
   [ -n "$OUTPUT_FILE" ] && file_exclude_args+=("-not" "-path" "*/$OUTPUT_FILE" "-not" "-path" "./$OUTPUT_FILE")
-  for pattern in "${INCLUDE_PATTERNS[@]}"; do file_pattern_args+=("-o" "-name" "$pattern"); done
-  file_pattern_args=("${file_pattern_args[@]:1}")
+
+  # Safely construct file pattern arguments
+  if [ ${#INCLUDE_PATTERNS[@]} -gt 0 ]; then
+    for pattern in "${INCLUDE_PATTERNS[@]}"; do
+      if [ ${#file_pattern_args[@]} -eq 0 ]; then
+        file_pattern_args+=("-name" "$pattern")
+      else
+        file_pattern_args+=("-o" "-name" "$pattern")
+      fi
+    done
+  else
+    # Default to all files if no patterns specified
+    file_pattern_args=("-name" "*")
+  fi
   for dir in "${EXCLUDE_DIRS[@]}"; do dir_exclude_args+=("-not" "-path" "*/$dir/*"); done
   for file in "${EXCLUDE_FILES[@]}"; do file_exclude_args+=("-not" "-name" "$file"); done
 
@@ -232,3 +244,5 @@ $SHOW_TREE && generate_tree
 $SHOW_FILES && generate_file_content
 
 [ -n "$TEMP_OUTPUT" ] && [ -n "$OUTPUT_FILE" ] && mv "$TEMP_OUTPUT" "$OUTPUT_FILE"
+
+exit 0
