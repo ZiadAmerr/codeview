@@ -277,6 +277,23 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Remove excluded file patterns from include patterns
+for exclude in "${EXCLUDE_FILES[@]}"; do
+  # Create a temporary array to store patterns we want to keep
+  temp_patterns=()
+  
+  for include in "${INCLUDE_PATTERNS[@]}"; do
+    # Only keep patterns that don't match the current exclude pattern
+    if [[ "$include" != "$exclude" ]]; then
+      temp_patterns+=("$include")
+    fi
+  done
+  
+  # Replace the original array with our filtered version
+  INCLUDE_PATTERNS=("${temp_patterns[@]}")
+done
+
+
 # Validate output format
 if [[ ! "$OUTPUT_FORMAT" =~ ^(text|markdown|json)$ ]]; then
   echo -e "${RED_BOLD}Error: Invalid output format. Must be one of: text, markdown, json${RESET}"
