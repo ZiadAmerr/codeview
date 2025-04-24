@@ -4,9 +4,7 @@ import tempfile
 import subprocess
 import unittest
 import shutil
-import re
 import json
-from pathlib import Path
 
 
 class CodeViewTestCase(unittest.TestCase):
