@@ -1,0 +1,298 @@
+#!/usr/bin/env bash
+
+# codeview - A tool to visualize codebases for LLM interactions
+# Version: 1.0.0
+
+# Colors
+RED_BOLD='\033[1;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+GRAY='\033[0;90m'
+YELLOW='\033[0;33m'
+RESET='\033[0m'
+
+# Default values
+OUTPUT_FORMAT="text"
+INCLUDE_PATTERNS=("*.py" "*.md" "*.js" "*.html" "*.css" "*.json" "*.yaml" "*.yml")
+EXCLUDE_DIRS=("myenv" "venv" ".venv" "node_modules" ".git" "__pycache__" ".pytest_cache" "build" "dist")
+EXCLUDE_FILES=("*.pyc" "*.pyo" "*.pyd" "*.so" "*.dll" "*.class" "*.egg-info" "*.egg")
+MAX_DEPTH="-1"  # No limit by default
+SHOW_TREE=true
+SHOW_FILES=true
+SHOW_LINE_NUMBERS=false
+OUTPUT_FILE=""
+SEARCH_PATTERN=""
+INCLUDE_DIRS=()
+
+# Function to print usage information
+print_usage() {
+    echo -e "${GREEN}codeview${RESET} - A tool to visualize codebases for LLM interactions"
+    echo
+    echo -e "Usage: ${YELLOW}codeview [options]${RESET}"
+    echo
+    echo "Options:"
+    echo "  -h, --help                 Show this help message"
+    echo "  -i, --include PATTERN      File patterns to include (can be used multiple times)"
+    echo "  -e, --exclude-dir DIR      Directories to exclude (can be used multiple times)"
+    echo "  -x, --exclude-file PATTERN File patterns to exclude (can be used multiple times)"
+    echo "  -d, --max-depth DEPTH      Maximum directory depth to traverse"
+    echo "  -t, --no-tree              Don't show directory tree"
+    echo "  -f, --no-files             Don't show file contents"
+    echo "  -n, --line-numbers         Show line numbers in file contents"
+    echo "  -o, --output FILE          Write output to file instead of stdout"
+    echo "  -s, --search PATTERN       Only include files containing the pattern"
+    echo "  -p, --path DIR             Include specific directory (can be used multiple times)"
+    echo "  -m, --format FORMAT        Output format: text (default), markdown, json"
+    echo
+    echo "Examples:"
+    echo "  codeview                                  # Show all code files in current directory"
+    echo "  codeview -i \"*.py\" -i \"*.js\"           # Only show Python and JavaScript files"
+    echo "  codeview -e node_modules -e .git         # Exclude node_modules and .git directories"
+    echo "  codeview -d 2                            # Only traverse 2 directory levels deep"
+    echo "  codeview -s \"def main\"                   # Only show files containing 'def main'"
+    echo "  codeview -p src/models -p src/utils      # Only include specific directories"
+    echo "  codeview -m markdown -o codebase.md      # Output in markdown format to a file"
+}
+
+# Function to check if a command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Function to generate tree view
+generate_tree() {
+    local exclude_args=()
+    
+    # Check if tree command exists
+    if ! command_exists tree; then
+        echo -e "${RED_BOLD}Warning: 'tree' command not found. Directory structure will not be shown.${RESET}"
+        echo -e "${YELLOW}Install it with: apt-get install tree (Debian/Ubuntu) or brew install tree (macOS)${RESET}"
+        echo
+        return
+    fi
+    
+    # Build exclude arguments for tree command
+    for dir in "${EXCLUDE_DIRS[@]}"; do
+        exclude_args+=("-I" "$dir")
+    done
+    
+    for file in "${EXCLUDE_FILES[@]}"; do
+        exclude_args+=("-I" "$file")
+    done
+    
+    # Add depth argument if specified
+    local depth_arg=()
+    if [ "$MAX_DEPTH" -ge 0 ]; then
+        depth_arg=("-L" "$MAX_DEPTH")
+    fi
+    
+    # Generate tree output
+    echo -e "${BLUE}Directory Structure:${RESET}"
+    echo
+    
+    if [ ${#INCLUDE_DIRS[@]} -eq 0 ]; then
+        # No specific directories specified, show tree for current directory
+        tree "${depth_arg[@]}" "${exclude_args[@]}" -f --dirsfirst --noreport
+    else
+        # Show tree for each specified directory
+        for dir in "${INCLUDE_DIRS[@]}"; do
+            if [ -d "$dir" ]; then
+                echo -e "${YELLOW}$dir${RESET}"
+                tree "${depth_arg[@]}" "${exclude_args[@]}" -f --dirsfirst --noreport "$dir"
+                echo
+            fi
+        done
+    fi
+    
+    echo
+}
+
+# Function to generate file content
+generate_file_content() {
+    local file_pattern_args=()
+    local dir_exclude_args=()
+    local file_exclude_args=()
+    
+    # Build find command arguments for file patterns
+    for pattern in "${INCLUDE_PATTERNS[@]}"; do
+        file_pattern_args+=("-o" "-name" "$pattern")
+    done
+    # Remove the first "-o" since we don't need it
+    file_pattern_args=("${file_pattern_args[@]:1}")
+    
+    # Build find command arguments for directory exclusions
+    for dir in "${EXCLUDE_DIRS[@]}"; do
+        dir_exclude_args+=("-not" "-path" "*/$dir/*")
+    done
+    
+    # Build find command arguments for file exclusions
+    for file in "${EXCLUDE_FILES[@]}"; do
+        file_exclude_args+=("-not" "-name" "$file")
+    done
+    
+    # Determine which directories to search
+    local search_dirs=()
+    if [ ${#INCLUDE_DIRS[@]} -eq 0 ]; then
+        search_dirs=(".")
+    else
+        search_dirs=("${INCLUDE_DIRS[@]}")
+    fi
+    
+    # Find all matching files
+    local files=()
+    for dir in "${search_dirs[@]}"; do
+        if [ -d "$dir" ]; then
+            # Add depth argument if specified
+            local depth_arg=()
+            if [ "$MAX_DEPTH" -ge 0 ]; then
+                depth_arg=("-maxdepth" "$MAX_DEPTH")
+            fi
+            
+            while IFS= read -r file; do
+                files+=("$file")
+            done < <(find "$dir" "${depth_arg[@]}" -type f $$ "${file_pattern_args[@]}" $$ "${dir_exclude_args[@]}" "${file_exclude_args[@]}" | sort)
+        fi
+    done
+    
+    # Filter files by search pattern if specified
+    if [ -n "$SEARCH_PATTERN" ]; then
+        local matching_files=()
+        for file in "${files[@]}"; do
+            if grep -q "$SEARCH_PATTERN" "$file" 2>/dev/null; then
+                matching_files+=("$file")
+            fi
+        done
+        files=("${matching_files[@]}")
+    fi
+    
+    # Output file contents based on format
+    case "$OUTPUT_FORMAT" in
+        "markdown")
+            for file in "${files[@]}"; do
+                local extension="${file##*.}"
+                echo -e "## $file"
+                echo
+                echo -e "\`\`\`$extension"
+                if [ "$SHOW_LINE_NUMBERS" = true ]; then
+                    nl -ba "$file"
+                else
+                    cat "$file"
+                fi
+                echo -e "\`\`\`"
+                echo
+            done
+            ;;
+            
+        "json")
+            echo "{"
+            echo "  \"files\": ["
+            local first_file=true
+            for file in "${files[@]}"; do
+                if [ "$first_file" = true ]; then
+                    first_file=false
+                else
+                    echo "    },"
+                fi
+                echo "    {"
+                echo "      \"path\": \"$file\","
+                echo "      \"content\": $(python3 -c "import json, sys; print(json.dumps(open('$file').read()))")"
+            done
+            if [ ${#files[@]} -gt 0 ]; then
+                echo "    }"
+            fi
+            echo "  ]"
+            echo "}"
+            ;;
+            
+        *)  # Default to text format
+            for file in "${files[@]}"; do
+                echo -e "${RED_BOLD}**$file**${RESET}"
+                if [ "$SHOW_LINE_NUMBERS" = true ]; then
+                    echo -e "${GRAY}$(nl -ba "$file")${RESET}"
+                else
+                    echo -e "${GRAY}$(cat "$file")${RESET}"
+                fi
+                echo
+            done
+            ;;
+    esac
+}
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+            print_usage
+            exit 0
+            ;;
+        -i|--include)
+            INCLUDE_PATTERNS+=("$2")
+            shift 2
+            ;;
+        -e|--exclude-dir)
+            EXCLUDE_DIRS+=("$2")
+            shift 2
+            ;;
+        -x|--exclude-file)
+            EXCLUDE_FILES+=("$2")
+            shift 2
+            ;;
+        -d|--max-depth)
+            MAX_DEPTH="$2"
+            shift 2
+            ;;
+        -t|--no-tree)
+            SHOW_TREE=false
+            shift
+            ;;
+        -f|--no-files)
+            SHOW_FILES=false
+            shift
+            ;;
+        -n|--line-numbers)
+            SHOW_LINE_NUMBERS=true
+            shift
+            ;;
+        -o|--output)
+            OUTPUT_FILE="$2"
+            shift 2
+            ;;
+        -s|--search)
+            SEARCH_PATTERN="$2"
+            shift 2
+            ;;
+        -p|--path)
+            INCLUDE_DIRS+=("$2")
+            shift 2
+            ;;
+        -m|--format)
+            OUTPUT_FORMAT="$2"
+            shift 2
+            ;;
+        *)
+            echo -e "${RED_BOLD}Error: Unknown option $1${RESET}"
+            print_usage
+            exit 1
+            ;;
+    esac
+done
+
+# Validate output format
+if [[ ! "$OUTPUT_FORMAT" =~ ^(text|markdown|json)$ ]]; then
+    echo -e "${RED_BOLD}Error: Invalid output format. Must be one of: text, markdown, json${RESET}"
+    exit 1
+fi
+
+# If output file is specified, redirect output to file
+if [ -n "$OUTPUT_FILE" ]; then
+    exec > "$OUTPUT_FILE"
+fi
+
+# Generate output
+if [ "$SHOW_TREE" = true ]; then
+    generate_tree
+fi
+
+if [ "$SHOW_FILES" = true ]; then
+    generate_file_content
+fi
