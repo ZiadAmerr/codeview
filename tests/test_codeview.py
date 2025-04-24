@@ -7,7 +7,7 @@ import shutil
 import json
 
 
-CODEVIEW_CMD = "codeview"
+CODEVIEW_CMD = "/Users/ziad/Desktop/codeview/bin/codeview"
 
 
 class CodeViewTestCase(unittest.TestCase):
@@ -387,6 +387,22 @@ class ComplexTests(CodeViewTestCase):
         result = self.run_codeview(["-i", "*.js", "-i", "*.css", "-m", "markdown"])
         self.assertIn("```js", result.stdout)
         self.assertIn("```css", result.stdout)
+    
+    def test_no_colors_in_output_if_output_file(self):
+        """Test that colors are not included in output if writing to a file"""
+        output_file = os.path.join(self.test_dir, "output.txt")
+        result = self.run_codeview(["-o", output_file])
+
+        # Check that the command succeeded
+        self.assertEqual(result.returncode, 0)
+
+        # Check that the file was created
+        self.assertTrue(os.path.exists(output_file))
+
+        # Check file contents
+        with open(output_file, "r") as f:
+            content = f.read()
+            self.assertNotIn("\033[", content)
 
 if __name__ == "__main__":
     unittest.main()

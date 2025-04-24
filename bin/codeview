@@ -4,6 +4,7 @@
 # Version: 1.0.0
 
 # Colors
+USE_COLORS=true
 RED_BOLD='\033[1;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -26,8 +27,11 @@ INCLUDE_DIRS=()
 TEMP_OUTPUT=""
 
 print_usage() {
-  printf "%bcodeview%b - A tool to visualize codebases for LLM interactions\n" "$GREEN" "$RESET"
-  printf "\nUsage: %bcodeview [options]%b\n\n" "$YELLOW" "$RESET"
+  local g=$GREEN r=$RESET y=$YELLOW
+  $USE_COLORS || g="" r="" y=""
+  
+  printf "%bcodeview%b - A tool to visualize codebases for LLM interactions\n" "$g" "$r"
+  printf "\nUsage: %bcodeview [options]%b\n\n" "$y" "$r"
   printf "Options:\n"
   printf "  -h, --help                 Show this help message\n"
   printf "  -i, --include PATTERN      File patterns to include (can be used multiple times)\n"
@@ -57,22 +61,27 @@ command_exists() {
 
 generate_tree() {
   local exclude_args=()
+  local b=$BLUE r=$RESET y=$YELLOW
+  $USE_COLORS || b="" r="" y=""
+  
   if ! command_exists tree; then
-    printf "%bWarning: 'tree' command not found. Directory structure will not be shown.%b\n\n" "$RED_BOLD" "$RESET"
-    printf "%bInstall it with: apt-get install tree (Debian/Ubuntu) or brew install tree (macOS)%b\n\n" "$YELLOW" "$RESET"
+    local rb=$RED_BOLD
+    $USE_COLORS || rb=""
+    printf "%bWarning: 'tree' command not found. Directory structure will not be shown.%b\n\n" "$rb" "$r"
+    printf "%bInstall it with: apt-get install tree (Debian/Ubuntu) or brew install tree (macOS)%b\n\n" "$y" "$r"
     return
   fi
   for dir in "${EXCLUDE_DIRS[@]}"; do exclude_args+=("-I" "$dir"); done
   for file in "${EXCLUDE_FILES[@]}"; do exclude_args+=("-I" "$file"); done
   local depth_arg=()
   [ "$MAX_DEPTH" -ge 0 ] && depth_arg=("-L" "$MAX_DEPTH")
-  printf "%bDirectory Structure:%b\n\n" "$BLUE" "$RESET"
+  printf "%bDirectory Structure:%b\n\n" "$b" "$r"
   if [ ${#INCLUDE_DIRS[@]} -eq 0 ]; then
     tree "${depth_arg[@]}" "${exclude_args[@]}" -f --dirsfirst --noreport
   else
     for dir in "${INCLUDE_DIRS[@]}"; do
       [ -d "$dir" ] && {
-        printf "%b%s%b\n" "$YELLOW" "$dir" "$RESET"
+        printf "%b%s%b\n" "$y" "$dir" "$r"
         tree "${depth_arg[@]}" "${exclude_args[@]}" -f --dirsfirst --noreport "$dir"
         printf "\n"
       }
@@ -83,6 +92,9 @@ generate_tree() {
 
 generate_file_content() {
   local file_pattern_args=() dir_exclude_args=() file_exclude_args=()
+  local rb=$RED_BOLD gr=$GRAY r=$RESET
+  $USE_COLORS || rb="" gr="" r=""
+  
   [ -n "$OUTPUT_FILE" ] && file_exclude_args+=("-not" "-path" "*/$OUTPUT_FILE" "-not" "-path" "./$OUTPUT_FILE")
 
   # Safely construct file pattern arguments
@@ -171,14 +183,14 @@ generate_file_content() {
     ;;
   *)
     for f in "${files[@]}"; do
-      printf "%b**%s**%b\n" "$RED_BOLD" "$f" "$RESET"
+      printf "%b**%s**%b\n" "$rb" "$f" "$r"
       if [ "$SHOW_LINE_NUMBERS" = true ]; then
         while IFS= read -r line; do
-          printf "%b%s%b\n" "$GRAY" "$line" "$RESET"
+          printf "%b%s%b\n" "$gr" "$line" "$r"
         done < <(nl -ba "$f")
       else
         while IFS= read -r line; do
-          printf "%b%s%b\n" "$GRAY" "$line" "$RESET"
+          printf "%b%s%b\n" "$gr" "$line" "$r"
         done <"$f"
       fi
       printf "\n"
@@ -224,6 +236,7 @@ while [[ $# -gt 0 ]]; do
     ;;
   -o | --output)
     OUTPUT_FILE="$2"
+    USE_COLORS=false  # Disable colors when output goes to a file
     shift 2
     ;;
   -s | --search)
@@ -239,7 +252,9 @@ while [[ $# -gt 0 ]]; do
     shift 2
     ;;
   *)
-    printf "%bError: Unknown option %s%b\n" "$RED_BOLD" "$1" "$RESET"
+    local rb=$RED_BOLD r=$RESET
+    $USE_COLORS || rb="" r=""
+    printf "%bError: Unknown option %s%b\n" "$rb" "$1" "$r"
     print_usage
     exit 1
     ;;
@@ -256,7 +271,9 @@ done
 # Validate format
 [[ ! "$OUTPUT_FORMAT" =~ ^(text|markdown|json)$ ]] && {
   # Print the error message to stderr
-  printf "%bError: Invalid output format. Must be one of: text, markdown, json%b\n" "$RED_BOLD" "$RESET" >&2
+  local rb=$RED_BOLD r=$RESET
+  $USE_COLORS || rb="" r=""
+  printf "%bError: Invalid output format. Must be one of: text, markdown, json%b\n" "$rb" "$r" >&2
   exit 1
 }
 
