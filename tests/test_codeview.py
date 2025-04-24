@@ -7,6 +7,9 @@ import shutil
 import json
 
 
+CODEVIEW_CMD = "codeview"
+
+
 class CodeViewTestCase(unittest.TestCase):
     """Base test class for CodeView tests"""
 
@@ -69,7 +72,7 @@ class CodeViewTestCase(unittest.TestCase):
 
     def run_codeview(self, args=None):
         """Run the codeview command with given arguments"""
-        cmd = ["codeview"]
+        cmd = [CODEVIEW_CMD]
         if args:
             cmd.extend(args)
 
@@ -279,6 +282,111 @@ class EdgeCaseTests(CodeViewTestCase):
         # Binary files should be excluded from file content
         self.assertNotIn("data.bin", result.stdout)
 
+
+class ComplexTests(CodeViewTestCase):
+    """Test complex scenarios"""
+
+    def test_multiple_filter_combinations(self):
+        """Test using multiple include/exclude filters together"""
+        result = self.run_codeview(["-i", "*.py", "-e", "tests", "-x", "setup.py"])
+
+        # Should include Python files
+        self.assertIn("src/main.py", result.stdout)
+
+        # Should exclude test directory files
+        self.assertNotIn("test_main.py", result.stdout)
+
+        # Should exclude specific excluded Python file
+        self.assertNotIn("setup.py", result.stdout)
+    
+    def test_unicode_content(self):
+        """Test handling files with Unicode characters"""
+        # Create a file with Unicode content
+        with open(os.path.join(self.test_dir, "unicode_file.py"), "w", encoding="utf-8") as f:
+            f.write(
+                '# -*- coding: utf-8 -*-\n\ndef unicode_func():\n    return "こんにちは世界"\n')
+
+        result = self.run_codeview(["-i", "unicode_file.py"])
+        self.assertIn("こんにちは世界", result.stdout)
+    
+    def test_large_file_handling(self):
+        """Test handling of relatively large files"""
+        # Create a large Python file
+        with open(os.path.join(self.test_dir, "large_file.py"), "w") as f:
+            f.write("# Large file test\n")
+            for i in range(1000):
+                f.write(f"# Line {i}\ndef func_{i}():\n    return {i}\n\n")
+
+        # Just verify it runs without error
+        result = self.run_codeview(["-i", "large_file.py"])
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("large_file.py", result.stdout)
+
+    def test_different_language_highlighting(self):
+        """Test syntax highlighting for different languages"""
+        # Create files with different extensions
+        with open(os.path.join(self.test_dir, "script.js"), "w") as f:
+            f.write("function hello() { return 'world'; }\n")
+        with open(os.path.join(self.test_dir, "styles.css"), "w") as f:
+            f.write("body { color: red; }\n")
+
+        # Check markdown output uses correct language tags
+        result = self.run_codeview(["-i", "*.js", "-i", "*.css", "-m", "markdown"])
+        self.assertIn("```js", result.stdout)
+        self.assertIn("```css", result.stdout)
+    
+    def test_json_output_validity(self):
+        """Test that JSON output is actually valid JSON"""
+        result = self.run_codeview(["-m", "json", "-t"])
+
+        # Try to parse the output as JSON
+        try:
+            parsed = json.loads(result.stdout)
+            self.assertIn("files", parsed)
+            self.assertTrue(isinstance(parsed["files"], list))
+        except json.JSONDecodeError:
+            self.fail("JSON output is not valid JSON")
+    
+    def test_empty_files(self):
+        """Test handling of empty files"""
+        # Create an empty file
+        with open(os.path.join(self.test_dir, "empty.py"), "w") as f:
+            pass
+
+        result = self.run_codeview(["-i", "empty.py"])
+        self.assertIn("empty.py", result.stdout)
+
+
+    def test_files_with_special_chars(self):
+        """Test handling of files with special characters in names"""
+        # Create a file with special characters in the name
+        special_filename = "special@#$%^&.py"
+        with open(os.path.join(self.test_dir, special_filename), "w") as f:
+            f.write("# File with special characters in name\n")
+
+        result = self.run_codeview(["-i", special_filename])
+        self.assertIn(special_filename, result.stdout)
+    
+    def test_command_line_args_from_shell(self):
+        """Test running codeview with shell-style arguments"""
+        # This simulates how the command would be used in a shell
+        cmd = CODEVIEW_CMD + " -i '*.py' -e 'tests' -m markdown"
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("```py", result.stdout)
+
+    def test_different_language_highlighting(self):
+        """Test syntax highlighting for different languages"""
+        # Create files with different extensions
+        with open(os.path.join(self.test_dir, "script.js"), "w") as f:
+            f.write("function hello() { return 'world'; }\n")
+        with open(os.path.join(self.test_dir, "styles.css"), "w") as f:
+            f.write("body { color: red; }\n")
+
+        # Check markdown output uses correct language tags
+        result = self.run_codeview(["-i", "*.js", "-i", "*.css", "-m", "markdown"])
+        self.assertIn("```js", result.stdout)
+        self.assertIn("```css", result.stdout)
 
 if __name__ == "__main__":
     unittest.main()
