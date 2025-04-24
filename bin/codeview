@@ -98,7 +98,16 @@ generate_file_content() {
     # Default to all files if no patterns specified
     file_pattern_args=("-name" "*")
   fi
-  for dir in "${EXCLUDE_DIRS[@]}"; do dir_exclude_args+=("-not" "-path" "*/$dir/*"); done
+  for dir in "${EXCLUDE_DIRS[@]}"; do 
+    # Match multiple possible path formats
+    dir_exclude_args+=("-not" "-path" "*/$dir/*")
+    dir_exclude_args+=("-not" "-path" "./$dir/*")
+    dir_exclude_args+=("-not" "-path" "$dir/*")
+    # Also exclude the directory itself
+    dir_exclude_args+=("-not" "-path" "*/$dir")
+    dir_exclude_args+=("-not" "-path" "./$dir")
+    dir_exclude_args+=("-not" "-path" "$dir")
+  done
   for file in "${EXCLUDE_FILES[@]}"; do file_exclude_args+=("-not" "-name" "$file"); done
 
   local search_dirs=(.) files=()
@@ -110,6 +119,22 @@ generate_file_content() {
       while IFS= read -r f; do files+=("$f"); done < <(find "$dir" "${depth_arg[@]}" -type f "${file_pattern_args[@]}" "${dir_exclude_args[@]}" "${file_exclude_args[@]}" | sort)
     fi
   done
+
+  # Additional filtering for excluded directories
+  if [ ${#EXCLUDE_DIRS[@]} -gt 0 ]; then
+    filtered_files=()
+    for f in "${files[@]}"; do
+      exclude=false
+      for dir in "${EXCLUDE_DIRS[@]}"; do
+        if [[ "$f" == *"/$dir/"* || "$f" == "./$dir/"* || "$f" == "$dir/"* ]]; then
+          exclude=true
+          break
+        fi
+      done
+      $exclude || filtered_files+=("$f")
+    done
+    files=("${filtered_files[@]}")
+  fi
 
   if [ -n "$SEARCH_PATTERN" ]; then
     local match=()
@@ -230,7 +255,8 @@ done
 
 # Validate format
 [[ ! "$OUTPUT_FORMAT" =~ ^(text|markdown|json)$ ]] && {
-  printf "%bError: Invalid output format. Must be one of: text, markdown, json%b\n" "$RED_BOLD" "$RESET"
+  # Print the error message to stderr
+  printf "%bError: Invalid output format. Must be one of: text, markdown, json%b\n" "$RED_BOLD" "$RESET" >&2
   exit 1
 }
 

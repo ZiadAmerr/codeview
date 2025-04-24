@@ -71,7 +71,7 @@ class CodeViewTestCase(unittest.TestCase):
 
     def run_codeview(self, args=None):
         """Run the codeview command with given arguments"""
-        cmd = ["/Users/ziad/Desktop/codeview/bin/codeview"]
+        cmd = ["codeview"]
         if args:
             cmd.extend(args)
 
@@ -164,8 +164,9 @@ class BasicFunctionalityTests(CodeViewTestCase):
         """Test showing line numbers"""
         result = self.run_codeview(["-n"])
 
-        # Line numbers should be shown with file contents like 1\tdef main():
-        self.assertRegex(result.stdout, r"\s+1\t+def main$$$$:")
+        print(json.dumps(result.__dict__, indent=4))
+
+        self.assertIn("1\tdef main():", result.stdout)
 
 
 class OutputFormatTests(CodeViewTestCase):
