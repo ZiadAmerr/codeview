@@ -3,6 +3,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/codeview.svg)](https://pypi.org/project/codeview/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python Versions](https://img.shields.io/pypi/pyversions/codeview.svg)](https://pypi.org/project/codeview/)
+![Tests](https://github.com/ZiadAmerr/codeview/actions/workflows/python-tests.yml/badge.svg)
 
 ## Overview
 
