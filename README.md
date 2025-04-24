@@ -37,7 +37,7 @@ pip install codeview
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/codeview.git
+git clone https://github.com/ZiadAmerr/codeview.git
 cd codeview
 
 # Install in development mode

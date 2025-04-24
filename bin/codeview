@@ -150,7 +150,7 @@ generate_file_content() {
             
             while IFS= read -r file; do
                 files+=("$file")
-            done < <(find "$dir" "${depth_arg[@]}" -type f $$ "${file_pattern_args[@]}" $$ "${dir_exclude_args[@]}" "${file_exclude_args[@]}" | sort)
+            done < <(find "$dir" "${depth_arg[@]}" -type f "${file_pattern_args[@]}" "${dir_exclude_args[@]}" "${file_exclude_args[@]}" | sort)
         fi
     done
     
