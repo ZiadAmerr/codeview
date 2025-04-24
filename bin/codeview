@@ -23,6 +23,7 @@ SHOW_LINE_NUMBERS=false
 OUTPUT_FILE=""
 SEARCH_PATTERN=""
 INCLUDE_DIRS=()
+TEMP_OUTPUT=""
 
 # Function to print usage information
 print_usage() {
@@ -112,6 +113,11 @@ generate_file_content() {
   local file_pattern_args=()
   local dir_exclude_args=()
   local file_exclude_args=()
+
+  # Add output file to exclusions if it exists
+  if [ -n "$OUTPUT_FILE" ]; then
+    file_exclude_args+=("-not" "-path" "*/$OUTPUT_FILE" "-not" "-path" "./$OUTPUT_FILE")
+  fi
 
   # Build find command arguments for file patterns
   for pattern in "${INCLUDE_PATTERNS[@]}"; do
@@ -302,7 +308,8 @@ fi
 
 # If output file is specified, redirect output to file
 if [ -n "$OUTPUT_FILE" ]; then
-  exec >"$OUTPUT_FILE"
+  TEMP_OUTPUT=$(mktemp)
+  exec >"$TEMP_OUTPUT"
 fi
 
 # Generate output
@@ -312,4 +319,8 @@ fi
 
 if [ "$SHOW_FILES" = true ]; then
   generate_file_content
+fi
+
+if [ -n "$TEMP_OUTPUT" ] && [ -n "$OUTPUT_FILE" ]; then
+  mv "$TEMP_OUTPUT" "$OUTPUT_FILE"
 fi
