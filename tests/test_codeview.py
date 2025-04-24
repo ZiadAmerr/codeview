@@ -7,7 +7,7 @@ import shutil
 import json
 
 
-CODEVIEW_CMD = "/Users/ziad/Desktop/codeview/bin/codeview"
+CODEVIEW_CMD = "codeview"
 
 
 class CodeViewTestCase(unittest.TestCase):
