@@ -13,7 +13,7 @@ A powerful tool to visualize codebases for LLM interactions and documentation pu
 
 ## Installation
 
-### From PyPI (when published)
+### From PyPI
 
 ```bash
 pip install codeview
